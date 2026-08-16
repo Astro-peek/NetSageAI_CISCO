@@ -5,28 +5,42 @@ import json
 import time
 from pathlib import Path
 import pandas as pd
+import streamlit as st
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from src.checker import run_checker
 
-# Load environment variables
+# Load environment variables from .env file (for local development)
 load_dotenv()
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "data" / "system_config.json"
 
 def _load_api_keys() -> list[str]:
-    """Load up to 5 Gemini API keys from .env.
+    """Load up to 5 Gemini API keys from Streamlit secrets or environment variables.
     Supports GEMINI_API_KEY_1..5 or falls back to GEMINI_API_KEY."""
     keys = []
-    for i in range(1, 6):
-        k = os.environ.get(f"GEMINI_API_KEY_{i}", "").strip()
-        if k:
-            keys.append(k)
+    # Try Streamlit secrets first (for cloud deployment)
+    try:
+        for i in range(1, 6):
+            k = st.secrets.get(f"GEMINI_API_KEY_{i}", "").strip()
+            if k:
+                keys.append(k)
+    except Exception:
+        # Fallback to environment variables (for local development)
+        for i in range(1, 6):
+            k = os.environ.get(f"GEMINI_API_KEY_{i}", "").strip()
+            if k:
+                keys.append(k)
+    
     if not keys:
-        fallback = os.environ.get("GEMINI_API_KEY", "").strip()
+        # Try fallback to single GEMINI_API_KEY
+        try:
+            fallback = st.secrets.get("GEMINI_API_KEY", "").strip()
+        except Exception:
+            fallback = os.environ.get("GEMINI_API_KEY", "").strip()
         if fallback:
             keys.append(fallback)
     return keys
