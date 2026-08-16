@@ -147,8 +147,15 @@ def diagnose(case_id: str) -> dict:
     for attempt in range(n_keys * 2):
         client = _next_client()
         try:
+            # Try to get model from Streamlit secrets first, then config
+            model_name = config["model"]["model_name"]
+            try:
+                model_name = st.secrets.get("GEMINI_MODEL", model_name)
+            except Exception:
+                model_name = os.environ.get("GEMINI_MODEL", model_name)
+            
             response = client.models.generate_content(
-                model=os.environ.get("GEMINI_MODEL", config["model"]["model_name"]),
+                model=model_name,
                 contents=user_content,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
@@ -160,7 +167,12 @@ def diagnose(case_id: str) -> dict:
             )
             parsed: DiagnosisSchema = response.parsed
             if parsed is None:
-                raise ValueError("LLM returned an empty or unparseable response")
+                # Try to get the raw text for debugging
+                try:
+                    raw_text = response.text
+                    raise ValueError(f"LLM returned unparseable response. Raw text: {raw_text[:200]}")
+                except Exception:
+                    raise ValueError("LLM returned an empty or unparseable response")
             return {
                 "case_id": case_id,
                 "root_cause": parsed.root_cause,
