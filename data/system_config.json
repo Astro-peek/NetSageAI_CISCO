@@ -1,0 +1,22 @@
+{
+  "model": {
+    "provider": "gemini",
+    "model_name": "gemini-3.5-flash",
+    "temperature": 0.2,
+    "max_output_tokens": 1000
+  },
+  "diagnosis": {
+    "confidence_low_threshold": 0.5,
+    "confidence_high_threshold": 0.85,
+    "checker_confidence_default": 1.0
+  },
+  "paths": {
+    "cases_csv": "data/cases.csv",
+    "audit_log": "data/audit_log.csv",
+    "prompt_template": "prompts/diagnose_prompt.md"
+  },
+  "app": {
+    "dashboard_title": "NetSage AI — Network Diagnostic Dashboard",
+    "show_confidence_warning_below": 0.5
+  }
+}
