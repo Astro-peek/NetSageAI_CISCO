@@ -155,7 +155,7 @@ total_cases = len(cases)
 reviewed = int(cases["case_id"].astype(str).isin(summary["case_id"].astype(str)).sum()) if not summary.empty else 0
 critical = int(cases["severity"].str.lower().eq("critical").sum())
 st.markdown(f'''<div class="brandbar"><div class="brand"><span class="brand-mark">NS</span>{html.escape(APP_TITLE)}</div><small><span class="live-dot"></span>Connected to {total_cases} live cases · {len(RULE_CATALOG)} active rules</small></div>''', unsafe_allow_html=True)
-tab_console, tab_cases, tab_rules, tab_audit = st.tabs(["OPERATOR CONSOLE", "CASE EXPLORER", "RULE COVERAGE", "AUDIT INSIGHTS"])
+tab_console, tab_audit = st.tabs(["OPERATOR CONSOLE", "AUDIT INSIGHTS"])
 
 with tab_console:
     diagnosis = st.session_state.diagnosis
@@ -222,38 +222,6 @@ with tab_console:
             if st.session_state.decision_logged:
                 st.success("Operator decision recorded. The console remains display-only.")
         st.markdown("</div>", unsafe_allow_html=True)
-
-with tab_cases:
-    st.markdown('<div class="panel"><div class="panel-title">Case explorer</div><div class="panel-subtitle">Filter the live case catalogue and open any incident in the operator console.</div></div>', unsafe_allow_html=True)
-    filter_one, filter_two, filter_three = st.columns([1,1,1.5])
-    severities = sorted(cases["severity"].astype(str).str.title().unique().tolist())
-    layers = sorted(cases["concept_tag"].map(layer_for_tag).unique().tolist())
-    with filter_one: active_severities = st.multiselect("Severity",severities,default=severities)
-    with filter_two: active_layers = st.multiselect("OSI layer",layers,default=layers)
-    with filter_three: search = st.text_input("Search symptoms, tags, or case IDs",placeholder="e.g. VLAN, NET-004, gateway")
-    explorer = cases.copy(); explorer["osi_layer"] = explorer["concept_tag"].map(layer_for_tag)
-    explorer = explorer[explorer["severity"].str.title().isin(active_severities) & explorer["osi_layer"].isin(active_layers)]
-    if search.strip():
-        searchable = explorer[["case_id","symptom","concept_tag","topology_note"]].astype(str).agg(" ".join,axis=1)
-        explorer = explorer[searchable.str.contains(search.strip(),case=False,na=False)]
-    explorer = explorer.merge(summary,on="case_id",how="left")
-    display = explorer[["case_id","symptom","concept_tag","osi_layer","severity","last_decision","last_action_at"]].copy()
-    display["last_action_at"] = display["last_action_at"].map(format_time); display["last_decision"] = display["last_decision"].replace("", "Unreviewed").fillna("Unreviewed")
-    st.dataframe(display,width="stretch",hide_index=True,column_config={"case_id":"Case","symptom":"Reported symptom","concept_tag":"Fault tag","osi_layer":"OSI layer","severity":"Severity","last_decision":"Latest decision","last_action_at":"Last action"})
-    if explorer.empty: st.info("No cases match the selected filters.")
-    else:
-        open_case = st.selectbox("Open a filtered case", explorer["case_id"].astype(str).tolist(),key="explorer_case")
-        if st.button("Open in operator console",type="primary"):
-            select_case(open_case); st.toast(f"{open_case} is ready in the Operator Console tab.")
-
-with tab_rules:
-    deterministic_results = cases["show_outputs"].map(run_checker)
-    deterministic_count = int(deterministic_results.notna().sum())
-    st.markdown(f'''<div class="panel"><div class="eyebrow">Executable coverage only</div><div class="rule-count">{len(RULE_CATALOG)} active rules</div><div class="panel-subtitle">{deterministic_count} of {total_cases} catalogue cases match the deterministic engine; {total_cases-deterministic_count} use the configured LLM fallback.</div></div>''',unsafe_allow_html=True)
-    rule_table = pd.DataFrame(RULE_CATALOG).rename(columns={"id":"Rule ID","title":"Fault signature","osi_layer":"OSI layer","signature":"Detection evidence","remediation":"Operator remediation"})
-    st.dataframe(rule_table,width="stretch",hide_index=True)
-    coverage = cases[["case_id","concept_tag","severity","symptom"]].copy(); coverage["diagnostic_path"] = deterministic_results.map(lambda result: "Rule engine" if isinstance(result,dict) else "LLM fallback"); coverage["rule_result"] = deterministic_results.map(lambda result: result.get("root_cause","") if isinstance(result,dict) else "")
-    st.markdown("<div class='panel-title' style='margin:1.15rem 0 .55rem'>Live case coverage</div>",unsafe_allow_html=True); st.dataframe(coverage,width="stretch",hide_index=True)
 
 with tab_audit:
     st.markdown('<div class="panel"><div class="panel-title">Audit insights</div><div class="panel-subtitle">Metrics are calculated from recorded operator decisions, not placeholders.</div></div>',unsafe_allow_html=True)
