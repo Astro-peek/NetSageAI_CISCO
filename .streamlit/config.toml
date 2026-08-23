@@ -1,9 +1,14 @@
 [theme]
-primaryColor = "#002db3"
-backgroundColor = "#f4f6fc"
-secondaryBackgroundColor = "#ffffff"
-textColor = "#0f172a"
+base = "dark"
+primaryColor = "#3ee0c4"
+backgroundColor = "#070b10"
+secondaryBackgroundColor = "#121c24"
+textColor = "#e8f0f4"
 font = "sans serif"
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = true
 
 [server]
 headless = true

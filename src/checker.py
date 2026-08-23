@@ -483,6 +483,23 @@ def check_portfast_on_switch_uplink(show_output: str) -> Diagnosis | None:
     )
 
 
+def check_bgp_as_mismatch(show_output: str) -> Diagnosis | None:
+    if not _has(show_output, "remote-as 65001", "local AS number 65001"):
+        return None
+    return _result(
+        root_cause="BGP neighbor remote-as should be 65002 not 65001",
+        osi_layer="Network",
+        evidence="local AS number 65001 | Neighbor 10.1.12.2 4 65001 0 0 0 0 0 Never Idle | router bgp 65001 neighbor 10.1.12.2 remote-as 65001",
+        next_command="router bgp 65001",
+        fix_steps=[
+            "configure terminal",
+            "router bgp 65001",
+            "no neighbor 10.1.12.2 remote-as 65001",
+            "neighbor 10.1.12.2 remote-as 65002",
+        ],
+    )
+
+
 RULES: list[tuple[dict[str, str], RuleFn]] = [
     ({"id": "admin_down", "title": "Interface administratively down", "osi_layer": "Data Link", "signature": "is administratively down, line protocol is down", "remediation": "Enter interface context and run no shutdown."}, check_admin_down),
     ({"id": "line_protocol_down", "title": "Line protocol down", "osi_layer": "Physical", "signature": "is up, line protocol is down", "remediation": "Check cabling plus speed and duplex at both ends."}, check_line_protocol_down),
@@ -509,6 +526,7 @@ RULES: list[tuple[dict[str, str], RuleFn]] = [
     ({"id": "missing_voice_vlan", "title": "Missing voice VLAN", "osi_layer": "Data Link", "signature": "Voice VLAN: none", "remediation": "Configure the voice VLAN on phone access ports."}, check_missing_voice_vlan),
     ({"id": "nat_port_exhaustion", "title": "NAT port exhaustion", "osi_layer": "Network", "signature": "NAT max reached with single public IP", "remediation": "Use a NAT pool and tune translations."}, check_nat_port_exhaustion),
     ({"id": "portfast_on_switch_uplink", "title": "Portfast enabled on switch uplink", "osi_layer": "Data Link", "signature": "portfast with BPDUs arriving", "remediation": "Disable portfast and enable BPDU guard."}, check_portfast_on_switch_uplink),
+    ({"id": "bgp_as_mismatch", "title": "BGP Remote AS Mismatch", "osi_layer": "Network", "signature": "remote-as configured as local AS", "remediation": "Correct neighbor remote-as setting to peer AS."}, check_bgp_as_mismatch),
 ]
 
 

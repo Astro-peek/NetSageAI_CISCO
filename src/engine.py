@@ -89,6 +89,112 @@ def load_system_prompt_with_few_shots(path: str) -> str:
         
     return full_instruction
 
+def diagnose_custom(symptom: str, topology_note: str, show_outputs: str) -> dict:
+    """Diagnose a brand-new incident supplied directly by the operator.
+
+    Runs the same two-stage pipeline as diagnose():
+      1. Deterministic checker rules (instant, auditable)
+      2. Gemini AI fallback if no rule fires
+    Never reads from or writes to cases.csv.
+    """
+    # Stage 1 — deterministic checker
+    checker_res = run_checker(show_outputs)
+    if checker_res:
+        checker_res["case_id"] = "CUSTOM"
+        return checker_res
+
+    # Stage 2 — LLM fallback
+    with CONFIG_PATH.open("r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    prompt_path = ROOT / config["paths"]["prompt_template"]
+    system_instruction = load_system_prompt_with_few_shots(prompt_path)
+
+    if not _API_KEYS:
+        return {
+            "case_id": "CUSTOM",
+            "root_cause": "No API keys configured",
+            "osi_layer": "Application",
+            "confidence": 0.0,
+            "evidence": "Set GEMINI_API_KEY or GEMINI_API_KEY_1..5 in .env",
+            "next_command": "",
+            "fix_steps": [],
+            "source": "error",
+        }
+
+    user_content = (
+        f'symptom: "{symptom}"\n'
+        f'topology_note: "{topology_note}"\n'
+        f"show_outputs: |\n  {show_outputs}"
+    )
+
+    n_keys = len(_API_KEYS)
+    last_err = None
+
+    for attempt in range(n_keys * 2):
+        client = _next_client()
+        try:
+            model_name = config["model"]["model_name"]
+            try:
+                model_name = st.secrets.get("GEMINI_MODEL", model_name)
+            except Exception:
+                model_name = os.environ.get("GEMINI_MODEL", model_name)
+
+            response = client.models.generate_content(
+                model=model_name,
+                contents=user_content,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=config["model"]["temperature"],
+                    max_output_tokens=config["model"]["max_output_tokens"],
+                    response_mime_type="application/json",
+                    response_schema=DiagnosisSchema,
+                ),
+            )
+            parsed: DiagnosisSchema = response.parsed
+            # Fallback: SDK v2.18.x bug — .parsed is None even when valid JSON is returned
+            if parsed is None:
+                raw_text = response.text
+                if not raw_text:
+                    raise ValueError("LLM returned an empty response")
+                try:
+                    data = json.loads(raw_text)
+                    parsed = DiagnosisSchema(**data)
+                except Exception as json_err:
+                    raise ValueError(f"LLM returned unparseable response: {raw_text[:200]}")
+            return {
+                "case_id": "CUSTOM",
+                "root_cause": parsed.root_cause,
+                "osi_layer": parsed.osi_layer,
+                "confidence": float(parsed.confidence),
+                "evidence": parsed.evidence,
+                "next_command": parsed.next_command,
+                "fix_steps": parsed.fix_steps,
+                "source": "llm",
+            }
+        except Exception as e:
+            last_err = e
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                if (attempt + 1) % n_keys == 0:
+                    delay_match = re.search(r"retryDelay.*?'(\d+)s'", err_str)
+                    wait_sec = int(delay_match.group(1)) + 2 if delay_match else 65
+                    time.sleep(wait_sec)
+            else:
+                break
+
+    return {
+        "case_id": "CUSTOM",
+        "root_cause": f"Diagnosis failed: {str(last_err)}",
+        "osi_layer": "Application",
+        "confidence": 0.0,
+        "evidence": f"API Error: {str(last_err)}",
+        "next_command": "",
+        "fix_steps": [],
+        "source": "error",
+    }
+
+
 def diagnose(case_id: str) -> dict:
     # 1. Load config
     with CONFIG_PATH.open("r", encoding="utf-8") as f:
@@ -166,13 +272,16 @@ def diagnose(case_id: str) -> dict:
                 )
             )
             parsed: DiagnosisSchema = response.parsed
+            # Fallback: SDK v2.18.x bug — .parsed is None even when valid JSON is returned
             if parsed is None:
-                # Try to get the raw text for debugging
+                raw_text = response.text
+                if not raw_text:
+                    raise ValueError("LLM returned an empty response")
                 try:
-                    raw_text = response.text
-                    raise ValueError(f"LLM returned unparseable response. Raw text: {raw_text[:200]}")
-                except Exception:
-                    raise ValueError("LLM returned an empty or unparseable response")
+                    data = json.loads(raw_text)
+                    parsed = DiagnosisSchema(**data)
+                except Exception as json_err:
+                    raise ValueError(f"LLM returned unparseable response: {raw_text[:200]}")
             return {
                 "case_id": case_id,
                 "root_cause": parsed.root_cause,

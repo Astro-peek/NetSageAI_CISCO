@@ -1,0 +1,58 @@
+[
+  {
+    "case_id": "NET-002",
+    "title": "NAT overload inside interface misconfiguration",
+    "ai_proposed_root_cause": "The inside interface Vlan20 is missing the 'ip nat inside' configuration.",
+    "operator_correction": "Operator accepted the diagnosis but edited the fix steps to perform active interface status checks first. AI assumed Vlan20 SVI was operationally up, but in practice SVI status must be validated to prevent traffic blackholing.",
+    "severity": "Medium",
+    "responsible_ai_lesson": "Context Instability: The AI failed to recommend checking interface status before applying NAT configuration. Operator oversight prevented a configuration change on a down interface, ensuring administrative and operational states are aligned first."
+  },
+  {
+    "case_id": "NET-010",
+    "title": "NAT overload ACL wildcard mask omission",
+    "ai_proposed_root_cause": "The standard access-list 5 used for NAT overload is configured with wildcard mask 255.255.255.0 to specify the subnet.",
+    "operator_correction": "Operator corrected '255.255.255.0' to use the inverse (wildcard) mask '0.0.0.255' in Cisco IOS syntax.",
+    "severity": "Medium",
+    "responsible_ai_lesson": "Hallucinated Syntax/Syntax Confusion: Cisco IOS requires an inverse wildcard mask for access-lists, while the AI suggested a subnet mask. If applied as suggested, the command would be rejected by IOS or fail to match properly, leading to potential network downtime. Human review corrected the syntax error."
+  },
+  {
+    "case_id": "NET-014",
+    "title": "Interface Duplex Mismatch",
+    "ai_proposed_root_cause": "Interface Fa0/0 and Fa0/1 are experiencing speed and duplex mismatch. Recommended setting both sides to 100Mbps/Full-Duplex.",
+    "operator_correction": "Operator edited recommended fix steps. Port Fa0/0 on Router1 is a legacy serial/ethernet processor card only supporting a maximum speed of 10Mbps. Forcing 100Mbps would disable the port. Operator modified the command to use 10Mbps/Half-Duplex.",
+    "severity": "Medium",
+    "responsible_ai_lesson": "Capability Omission: The AI suggested configuration parameters that exceeded the hardware's physical design constraints because it did not verify host interface module limits. Real-world verification by a human operator prevented manual port disabling."
+  },
+  {
+    "case_id": "NET-020",
+    "title": "NAT ACL missing subnet permit entry",
+    "ai_proposed_root_cause": "Access-list 5 is missing a permit statement for the VLAN 70 subnet (192.168.70.0/24). Action: Add permit entry.",
+    "operator_correction": "Operator approved adding the ACL entry but also manually added the missing 'ip nat inside' configuration to the newly created VLAN 70 SVI interface, which the AI overlooked.",
+    "severity": "Medium",
+    "responsible_ai_lesson": "Omission Bias (Focusing on a Single Point of Failure): The AI correctly identified the ACL restriction but missed the dependency that VLAN 70 SVI itself lacked the necessary NAT IP markings. Operator check ensured end-to-end functionality rather than just patching the immediate symptom."
+  },
+  {
+    "case_id": "NET-030",
+    "title": "Spanning Tree Loop via Portfast enabled uplink",
+    "ai_proposed_root_cause": "Fa0/12 has 'spanning-tree portfast' enabled. Discard the command completely to prevent loop.",
+    "operator_correction": "Operator edited commands. Instead of just disabling portfast, the port was configured with BPDU Guard ('spanning-tree bpduguard enable') to allow fast workstation initialization while preserving automated loop blocking if a switch is connected.",
+    "severity": "High",
+    "responsible_ai_lesson": "Naive Mitigation (Suboptimal security posture): The AI proposed removing a useful performance feature (portfast) rather than proposing the robust defensive standard (BPDU Guard) for access ports. Human design standards override basic suggestions to maintain security policy."
+  },
+  {
+    "case_id": "NET-002",
+    "title": "PC2 cannot reach any external website",
+    "ai_proposed_root_cause": "Missing 'ip nat inside' on Vlan20 interface",
+    "operator_correction": "Operator edited commands to:\nconfigure terminal\ninterface Vlan20\nip nat inside\nip set",
+    "severity": "medium",
+    "responsible_ai_lesson": "Operator modified recommended commands to fix parameters before deployment."
+  },
+  {
+    "case_id": "NET-002",
+    "title": "PC2 cannot reach any external website",
+    "ai_proposed_root_cause": "Missing 'ip nat inside' on Vlan20 interface",
+    "operator_correction": "Operator rejected proposed diagnosis.",
+    "severity": "medium",
+    "responsible_ai_lesson": "Operator rejected the AI diagnosis as incorrect."
+  }
+]
