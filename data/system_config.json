@@ -3,7 +3,7 @@
     "provider": "gemini",
     "model_name": "gemini-3.6-flash",
     "temperature": 0.2,
-    "max_output_tokens": 1000
+    "max_output_tokens": 4096
   },
   "diagnosis": {
     "confidence_low_threshold": 0.5,
