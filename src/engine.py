@@ -161,7 +161,7 @@ def diagnose_custom(symptom: str, topology_note: str, show_outputs: str) -> dict
                     data = json.loads(raw_text)
                     parsed = DiagnosisSchema(**data)
                 except Exception as json_err:
-                    raise ValueError(f"LLM returned unparseable response: {raw_text[:200]}")
+                    raise ValueError(f"LLM returned unparseable response. JSON Error: {str(json_err)}. Raw Content: {raw_text}")
             return {
                 "case_id": "CUSTOM",
                 "root_cause": parsed.root_cause,
@@ -281,7 +281,7 @@ def diagnose(case_id: str) -> dict:
                     data = json.loads(raw_text)
                     parsed = DiagnosisSchema(**data)
                 except Exception as json_err:
-                    raise ValueError(f"LLM returned unparseable response: {raw_text[:200]}")
+                    raise ValueError(f"LLM returned unparseable response. JSON Error: {str(json_err)}. Raw Content: {raw_text}")
             return {
                 "case_id": case_id,
                 "root_cause": parsed.root_cause,
